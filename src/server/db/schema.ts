@@ -1,8 +1,6 @@
-// Example model schema from the Drizzle docs
-// https://orm.drizzle.team/docs/sql-schema-declaration
+// Schema for PostgreSQL database with Drizzle ORM
 
-import { sql } from "drizzle-orm";
-import { index, int, sqliteTableCreator, text } from "drizzle-orm/sqlite-core";
+import { pgTable, serial, text, timestamp, index } from "drizzle-orm/pg-core";
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -10,21 +8,22 @@ import { index, int, sqliteTableCreator, text } from "drizzle-orm/sqlite-core";
  *
  * @see https://orm.drizzle.team/docs/goodies#multi-project-schema
  */
-export const createTable = sqliteTableCreator((name) => `askLou-prototype_${name}`);
+const tablePrefix = "askLou-prototype_";
 
-export const posts = createTable(
-  "post",
+// Add this to your schema.ts file
+export const aiConversations = pgTable(
+  `${tablePrefix}ai_conversations`,
   {
-    id: int("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-    name: text("name", { length: 256 }),
-    createdAt: int("created_at", { mode: "timestamp" })
-      .default(sql`(unixepoch())`)
-      .notNull(),
-    updatedAt: int("updated_at", { mode: "timestamp" }).$onUpdate(
-      () => new Date()
-    ),
+    id: serial("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    prompt: text("prompt").notNull(),
+    response: text("response").notNull(),
+    feedback: text("feedback"),
+    rating: serial("rating"),
+    timestamp: timestamp("timestamp").defaultNow(),
+    metadata: text("metadata"), // Can store JSON stringified data about the conversation
   },
-  (example) => ({
-    nameIndex: index("name_idx").on(example.name),
+  (table) => ({
+    userIdIndex: index("user_id_idx").on(table.userId),
   })
 );
