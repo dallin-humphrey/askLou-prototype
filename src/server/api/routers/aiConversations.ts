@@ -2,6 +2,8 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { aiConversations } from "~/server/db/schema";
+// 👇 Import the eq operator from drizzle-orm
+import { eq } from "drizzle-orm";
 
 export const aiConversationsRouter = createTRPCRouter({
   // Get all conversations
@@ -13,10 +15,11 @@ export const aiConversationsRouter = createTRPCRouter({
   getById: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
+      // 👇 Fixed the where clause with proper drizzle syntax
       const [result] = await ctx.db
         .select()
         .from(aiConversations)
-        .where(({ id }) => id.eq(input.id));
+        .where(eq(aiConversations.id, input.id));
       
       return result;
     }),

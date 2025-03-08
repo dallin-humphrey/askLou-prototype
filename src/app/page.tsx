@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { HydrateClient } from "~/trpc/server";
-import { AIConversationsDisplay } from "~/app/_components/aiConversations";
 
 export default async function Home() {
 	return (
@@ -25,11 +24,6 @@ export default async function Home() {
 						<h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
 							Ask <span className="text-louPrimary">Lou</span> Prototype
 						</h1>
-					</div>
-
-					<div className="w-full max-w-4xl rounded-xl bg-white/10 p-6 backdrop-blur-sm">
-						<h2 className="mb-4 text-2xl font-bold">Recent AI Conversations</h2>
-						<AIConversationsDisplay />
 					</div>
 
 					<div className="flex justify-center">
