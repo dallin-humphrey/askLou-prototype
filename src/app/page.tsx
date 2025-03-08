@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { HydrateClient } from "~/trpc/server";
+import { ChatThread } from "./_components/chatThread";
 
 export default async function Home() {
 	return (
@@ -25,7 +26,7 @@ export default async function Home() {
 							Ask <span className="text-louPrimary">Lou</span> Prototype
 						</h1>
 					</div>
-
+					<ChatThread />
 					<div className="flex justify-center">
 						<Link
 							className="rounded-full bg-louPrimary px-10 py-3 font-semibold text-white no-underline transition hover:bg-louPrimary/80"
