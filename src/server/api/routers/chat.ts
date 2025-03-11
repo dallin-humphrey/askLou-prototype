@@ -3,7 +3,6 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { aiConversations } from "~/server/db/schema";
 import { type InferInsertModel } from "drizzle-orm";
-import { type ConversationId, type Rating } from "~/types/branded";
 
 // Create a type for the AI conversation model
 type AIConversation = InferInsertModel<typeof aiConversations> & { id: number };
