@@ -1,16 +1,36 @@
-// src/app/_components/ChatThread.tsx
-"use client";
-
+// Update src/app/_components/ChatThread.tsx
+'use client'
 import { useState, useRef, useEffect } from "react";
 import { api } from "~/trpc/react";
 import { MessageRole, type ChatMessage, createMessageId } from "~/types/chat";
-import { createConversationId } from "~/types/branded";
+import { createConversationId, type Rating } from "~/types/branded";
+import { RatingComponent } from "./RatingComponent"; // Import the new component
 
 export function ChatThread() {
 	const [input, setInput] = useState("");
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
+
+	// Add the rating mutation
+	const updateRating = api.aiConversations.updateRating.useMutation({
+		onSuccess: (response) => {
+			// Update the local messages state with the new rating
+			setMessages(prev => prev.map(msg =>
+				msg.conversationId === createConversationId(response.id.toString())
+					? { ...msg, rating: response.rating as Rating | null }
+					: msg
+			));
+		}
+	});
+
+	// Add rating handler function
+	const handleRatingChange = (conversationId: string, rating: number) => {
+		updateRating.mutate({
+			conversationId: parseInt(conversationId),
+			rating
+		});
+	};
 
 	// TRPC mutation for sending messages to OpenAI
 	const sendMessage = api.aiConversations.chatWithAI.useMutation({
@@ -22,6 +42,7 @@ export function ChatThread() {
 				role: MessageRole.Assistant,
 				content: response.response,
 				timestamp: new Date(),
+				rating: response.rating as Rating | null, // Include any existing rating
 			}]);
 			setIsLoading(false);
 		},
@@ -33,6 +54,7 @@ export function ChatThread() {
 				role: MessageRole.Assistant,
 				content: `Error: ${error.message}`,
 				timestamp: new Date(),
+				rating: null,
 			}]);
 			setIsLoading(false);
 		}
@@ -84,7 +106,7 @@ export function ChatThread() {
 					messages.map(message => (
 						<div
 							key={message.id}
-							className={`flex ${message.role === MessageRole.User ? 'justify-end' : 'justify-start'}`}
+							className={`flex flex-col ${message.role === MessageRole.User ? 'items-end' : 'items-start'}`}
 						>
 							<div
 								className={`max-w-[80%] rounded-lg p-3 ${message.role === MessageRole.User
@@ -94,6 +116,15 @@ export function ChatThread() {
 							>
 								{message.content}
 							</div>
+
+							{/* Add rating component only for assistant messages */}
+							{message.role === MessageRole.Assistant && (
+								<RatingComponent
+									conversationId={message.conversationId}
+									initialRating={message.rating || null}
+									onRatingChange={handleRatingChange}
+								/>
+							)}
 						</div>
 					))
 				)}

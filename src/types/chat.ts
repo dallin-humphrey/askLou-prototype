@@ -1,6 +1,6 @@
 // src/types/chat.ts
 import { type Brand } from "./branded";
-import { type ConversationId, type UserId } from "./branded";
+import { type ConversationId, type UserId, type Rating } from "./branded";
 
 export type MessageId = Brand<string, "MessageId">;
 
@@ -16,6 +16,7 @@ export interface ChatMessage {
   role: MessageRole;
   content: string;
   timestamp: Date;
+  rating?: Rating | null; // Added rating field
 }
 
 export interface ChatThread {

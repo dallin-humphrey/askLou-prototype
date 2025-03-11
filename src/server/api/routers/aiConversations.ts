@@ -94,5 +94,21 @@ export const aiConversationsRouter = createTRPCRouter({
         throw new Error("Failed to get response from OpenAI");
       }
     }
-  })
+  }),
+  
+  // Update conversation rating
+  updateRating: publicProcedure
+    .input(z.object({
+      conversationId: z.number(),
+      rating: z.number().min(0).max(5)
+    }))
+    .mutation(async ({ ctx, input }): Promise<AIConversation> => {
+      const [result] = await ctx.db
+        .update(aiConversations)
+        .set({ rating: input.rating })
+        .where(eq(aiConversations.id, input.conversationId))
+        .returning() as [AIConversation, ...AIConversation[]];
+        
+      return result;
+    })
 });
