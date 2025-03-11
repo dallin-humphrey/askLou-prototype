@@ -6,6 +6,11 @@ import { api } from "~/trpc/react";
 import { type AIConversation } from "~/types/conversations";
 import { createConversationId, createTimestamp, createUserId, type Rating } from "~/types/branded";
 
+// Define props interface
+interface AIConversationsDisplayProps {
+	showAll?: boolean;
+}
+
 type ConversationDisplayProps = {
 	conversation: AIConversation;
 };
@@ -68,7 +73,7 @@ const ConversationDisplay = ({ conversation }: ConversationDisplayProps) => {
 /**
  * Component for displaying all conversations
  */
-export function AIConversationsDisplay() {
+export function AIConversationsDisplay({ showAll = false }: AIConversationsDisplayProps) {
 	const {
 		data: rawConversations,
 		isLoading,
@@ -105,10 +110,12 @@ export function AIConversationsDisplay() {
 	}, []);
 
 	// Use useMemo for the sorted conversations to avoid unnecessary re-sorting
-	const recentConversations = useMemo(() => {
+	const displayedConversations = useMemo(() => {
 		if (!hasConversations(conversations)) return [];
-		return [...conversations].sort(sortConversations).slice(0, 3);
-	}, [conversations, sortConversations]);
+		const sortedConversations = [...conversations].sort(sortConversations);
+		// If showAll is true, return all conversations, otherwise just the first 3
+		return showAll ? sortedConversations : sortedConversations.slice(0, 3);
+	}, [conversations, sortConversations, showAll]);
 
 	if (isLoading) return <div className="text-center py-4">Loading conversations...</div>;
 
@@ -124,7 +131,7 @@ export function AIConversationsDisplay() {
 
 	return (
 		<div className="space-y-4">
-			{recentConversations.map((convo) => (
+			{displayedConversations.map((convo) => (
 				<ConversationDisplay key={convo.id} conversation={convo} />
 			))}
 		</div>

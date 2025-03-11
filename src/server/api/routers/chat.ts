@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { aiConversations } from "~/server/db/schema";
 import { type InferInsertModel } from "drizzle-orm";
+import { type ConversationId, type Rating } from "~/types/branded";
 
 // Create a type for the AI conversation model
 type AIConversation = InferInsertModel<typeof aiConversations> & { id: number };
@@ -14,8 +15,6 @@ export const chatRouter = createTRPCRouter({
       conversationId: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Here you would call your AI service (OpenAI, etc.)
-      // For now, we'll mock a simple response
       
       // Simulate network delay
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -27,12 +26,12 @@ export const chatRouter = createTRPCRouter({
       const [result] = await ctx.db
         .insert(aiConversations)
         .values({
-          userId: "user-1", // You'd get this from auth
+          userId: "user-1",
           prompt: input.message,
           response: aiResponse,
           timestamp: new Date(),
         })
-        .returning() as [AIConversation, ...AIConversation[]]; // 👈 This is the magic!
+        .returning() as [AIConversation, ...AIConversation[]];
       
       return {
         text: aiResponse,

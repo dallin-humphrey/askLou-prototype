@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from "react";
 import { api } from "~/trpc/react";
 import { MessageRole, type ChatMessage, createMessageId } from "~/types/chat";
-import { createConversationId, createUserId } from "~/types/branded";
+import { createConversationId } from "~/types/branded";
 
 export function ChatThread() {
 	const [input, setInput] = useState("");
@@ -12,15 +12,26 @@ export function ChatThread() {
 	const [isLoading, setIsLoading] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 
-	// TRPC mutation for sending messages
-	const sendMessage = api.chat.sendMessage.useMutation({
+	// TRPC mutation for sending messages to OpenAI
+	const sendMessage = api.aiConversations.chatWithAI.useMutation({
 		onSuccess: (response) => {
 			// Add the assistant's response to the messages
 			setMessages(prev => [...prev, {
 				id: createMessageId(crypto.randomUUID()),
-				conversationId: createConversationId("1"), // You'd use the actual conversation ID
+				conversationId: createConversationId(response.id.toString()),
 				role: MessageRole.Assistant,
-				content: response.text,
+				content: response.response,
+				timestamp: new Date(),
+			}]);
+			setIsLoading(false);
+		},
+		onError: (error) => {
+			// Handle error
+			setMessages(prev => [...prev, {
+				id: createMessageId(crypto.randomUUID()),
+				conversationId: createConversationId("1"),
+				role: MessageRole.Assistant,
+				content: `Error: ${error.message}`,
 				timestamp: new Date(),
 			}]);
 			setIsLoading(false);
@@ -38,7 +49,7 @@ export function ChatThread() {
 		// Add user message to the UI
 		const userMessage: ChatMessage = {
 			id: createMessageId(crypto.randomUUID()),
-			conversationId: createConversationId("1"), // You'd use the actual conversation ID
+			conversationId: createConversationId("1"), // Temporary ID until we get response
 			role: MessageRole.User,
 			content: input,
 			timestamp: new Date(),
@@ -48,14 +59,18 @@ export function ChatThread() {
 		setIsLoading(true);
 		setInput("");
 
-		// Send to backend
-		sendMessage.mutate({ message: input });
+		// Send to OpenAI via our tRPC endpoint
+		sendMessage.mutate({
+			userId: "current-user", // Replace with actual user ID if available
+			prompt: input,
+			metadata: JSON.stringify({ source: "chat_interface" })
+		});
 	};
 
 	return (
-		<div className="flex flex-col h-[600px] w-full max-w-4xl rounded-xl bg-white/10 backdrop-blur-sm overflow-hidden">
+		<div className="flex flex-col h-[600px] w-full max-w-4xl rounded-xl bg-louGray2/90 backdrop-blur-md overflow-hidden">
 			{/* Chat header */}
-			<div className="bg-louPrimary/30 p-4 border-b border-white/20">
+			<div className="bg-louPrimary p-4 border-b border-white/20">
 				<h2 className="text-xl font-bold">Ask Lou</h2>
 			</div>
 
@@ -74,7 +89,7 @@ export function ChatThread() {
 							<div
 								className={`max-w-[80%] rounded-lg p-3 ${message.role === MessageRole.User
 									? 'bg-louPrimary text-white'
-									: 'bg-white/20 text-white'
+									: 'bg-white/20 backdrop-blur-md text-white'
 									}`}
 							>
 								{message.content}
@@ -84,7 +99,7 @@ export function ChatThread() {
 				)}
 				{isLoading && (
 					<div className="flex justify-start">
-						<div className="bg-white/20 text-white rounded-lg p-3">
+						<div className="bg-white/20 backdrop-blur-md text-white rounded-lg p-3">
 							<div className="flex space-x-2">
 								<div className="animate-bounce">●</div>
 								<div className="animate-bounce delay-100">●</div>
@@ -97,7 +112,7 @@ export function ChatThread() {
 			</div>
 
 			{/* Input area */}
-			<div className="p-4 border-t border-white/20">
+			<div className="p-4 border-t border-white/20 bg-louGray2/90">
 				<form
 					onSubmit={(e) => {
 						e.preventDefault();

@@ -6,25 +6,28 @@ export default async function ConversationsPage() {
 	return (
 		<HydrateClient>
 			<main className="relative flex min-h-screen flex-col items-center bg-louGray1 text-white overflow-hidden">
-				{/* Noise texture overlay */}
+				{/* Noise texture overlay - ONLY for page background */}
 				<div className="absolute inset-0 bg-noise-texture opacity-30 mix-blend-overlay pointer-events-none"></div>
 
 				<div className="container relative z-10 flex flex-col items-center gap-8 px-4 py-12">
-					<div className="flex w-full justify-between items-center">
+					{/* Header with solid background */}
+					<div className="flex w-full justify-between items-center bg-louGray1/80 backdrop-blur-sm p-4 rounded-lg">
 						<h1 className="text-3xl font-bold sm:text-4xl">All Conversations</h1>
 						<Link
 							href="/"
-							className="bg-louBlack/30 hover:bg-louBlack/50 px-4 py-2 rounded-md transition-colors"
+							className="bg-louBlack/60 hover:bg-louBlack/80 px-4 py-2 rounded-md transition-colors"
 						>
 							Back to Home
 						</Link>
 					</div>
 
-					<div className="w-full max-w-6xl rounded-xl bg-white/10 p-6 backdrop-blur-sm">
+					{/* Conversations with strengthened background */}
+					<div className="w-full max-w-6xl rounded-xl bg-louGray1/90 p-6 backdrop-blur-md">
 						<AIConversationsDisplay showAll={true} />
 					</div>
 
-					<div className="w-full max-w-6xl mt-6">
+					{/* Button container with background */}
+					<div className="w-full max-w-6xl mt-6 bg-louGray1/80 backdrop-blur-sm p-3 rounded-lg">
 						<Link
 							className="inline-flex items-center bg-louPrimary px-6 py-3 rounded-md font-semibold text-white no-underline transition hover:bg-louPrimary/80"
 							href="/conversations/new"

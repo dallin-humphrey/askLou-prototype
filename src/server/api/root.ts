@@ -10,6 +10,7 @@ import { chatRouter } from "~/server/api/routers/chat";
 export const appRouter = createTRPCRouter({
   aiConversations: aiConversationsRouter,
   chat: chatRouter,
+  openai: aiConversationsRouter
 });
 
 // export type definition of API
