@@ -48,10 +48,11 @@ export const aiConversationsRouter = createTRPCRouter({
     }),
     
   // New procedure: Get response from OpenAI and store the conversation
-  chatWithAI: publicProcedure
+chatWithAI: publicProcedure
   .input(z.object({
     userId: z.string(),
     prompt: z.string(),
+    conversationId: z.string().optional(), // Add this to link messages
     metadata: z.string().optional()
   }))
   .mutation(async ({ ctx, input }): Promise<AIConversation> => {
@@ -61,16 +62,34 @@ export const aiConversationsRouter = createTRPCRouter({
     });
 
     try {
-      console.log("OpenAI API Key:", env.OPENAI_API_KEY.substring(0, 7) + "...");
-      console.log("Sending request to OpenAI with prompt:", input.prompt);
+      // Prepare message history
+      const messages = [];
       
-      // Get response from OpenAI
+      // If conversationId exists, fetch previous messages in this conversation
+      if (input.conversationId) {
+        const previousMessages = await ctx.db
+          .select()
+          .from(aiConversations)
+          .where(eq(aiConversations.id, parseInt(input.conversationId)))
+          .orderBy(aiConversations.timestamp, 'asc');
+          
+        // Build message history for context
+        for (const msg of previousMessages) {
+          messages.push({ role: "user", content: msg.prompt });
+          messages.push({ role: "assistant", content: msg.response });
+        }
+      }
+      
+      // Add the current prompt
+      messages.push({ role: "user", content: input.prompt });
+      
+      console.log("Sending request to OpenAI with messages:", messages);
+      
+      // Get response from OpenAI with full context
       const aiResponse = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: input.prompt }],
+        messages: messages,
       });
-
-      console.log("Received response from OpenAI:", aiResponse);
 
       const responseText = aiResponse.choices[0]?.message?.content ?? "No response generated";
       

@@ -34,6 +34,7 @@ export function ChatThread() {
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(undefined);
 
 	// Add the rating mutation
 	const updateRating = api.aiConversations.updateRating.useMutation({
@@ -59,7 +60,7 @@ export function ChatThread() {
 	const sendMessage = api.aiConversations.chatWithAI.useMutation({
 		onSuccess: (response) => {
 			console.log("Received AI response:", response.response);
-
+			setCurrentConversationId(response.id.toString());
 			// Add the assistant's response to the messages
 			setMessages(prev => [...prev, {
 				id: createMessageId(crypto.randomUUID()),
@@ -110,8 +111,9 @@ export function ChatThread() {
 
 		// Send to OpenAI via our tRPC endpoint
 		sendMessage.mutate({
-			userId: "current-user", // Replace with actual user ID if available
+			userId: "current-user",
 			prompt: input,
+			conversationId: currentConversationId,
 			metadata: JSON.stringify({ source: "chat_interface" })
 		});
 	};
