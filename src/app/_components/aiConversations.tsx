@@ -5,6 +5,7 @@ import { useCallback, useMemo } from "react";
 import { api } from "~/trpc/react";
 import { type AIConversation } from "~/types/conversations";
 import { createConversationId, createTimestamp, createUserId, type Rating } from "~/types/branded";
+import ReactMarkdown from 'react-markdown';
 
 // Define props interface
 interface AIConversationsDisplayProps {
@@ -42,7 +43,9 @@ const ConversationDisplay = ({ conversation }: ConversationDisplayProps) => {
 
 			<div className="mb-3">
 				<h3 className="text-sm font-semibold opacity-70">Response:</h3>
-				<p className="p-2 bg-white/5 rounded">{conversation.response}</p>
+				<div className="p-2 bg-white/5 rounded prose prose-invert prose-sm max-w-none">
+					<ReactMarkdown>{conversation.response}</ReactMarkdown>
+				</div>
 			</div>
 
 			{conversation.feedback && (

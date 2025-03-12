@@ -36,5 +36,8 @@ backgroundImage: {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+    // Other plugins...
+  ],
 };

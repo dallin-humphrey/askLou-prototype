@@ -5,6 +5,29 @@ import { api } from "~/trpc/react";
 import { MessageRole, type ChatMessage, createMessageId } from "~/types/chat";
 import { createConversationId, type Rating } from "~/types/branded";
 import { RatingComponent } from "./RatingComponent"; // Import the new component
+import ReactMarkdown from 'react-markdown'; // Add this import
+
+// Enhanced preprocessing function with better regex and logging
+const preprocessText = (text: string): string => {
+	console.log("Original text:", text);
+
+	// More robust regex that handles periods within the text
+	const numberedListRegex = /(\d+\.\s+.+?)(?=\s+\d+\.\s+|\s*$)/gs;
+	let processedText = text.replace(numberedListRegex, '$1\n\n');
+
+	// Process bullet points if needed
+	processedText = processedText.replace(/(\•\s+[^\•\n]+)(?=\s+\•|\s*$)/g, '$1\n\n');
+
+	// Process dash lists
+	processedText = processedText.replace(/(\-\s+[^\-\n]+)(?=\s+\-|\s*$)/g, '$1\n\n');
+
+	console.log("Processed text:", processedText);
+	console.log("Transformation summary:", text === processedText ?
+		"No changes made" :
+		"Text was reformatted for better markdown rendering");
+
+	return processedText;
+};
 
 export function ChatThread() {
 	const [input, setInput] = useState("");
@@ -35,6 +58,8 @@ export function ChatThread() {
 	// TRPC mutation for sending messages to OpenAI
 	const sendMessage = api.aiConversations.chatWithAI.useMutation({
 		onSuccess: (response) => {
+			console.log("Received AI response:", response.response);
+
 			// Add the assistant's response to the messages
 			setMessages(prev => [...prev, {
 				id: createMessageId(crypto.randomUUID()),
@@ -67,6 +92,8 @@ export function ChatThread() {
 
 	const handleSendMessage = () => {
 		if (!input.trim() || isLoading) return;
+
+		console.log("Sending message:", input);
 
 		// Add user message to the UI
 		const userMessage: ChatMessage = {
@@ -114,14 +141,22 @@ export function ChatThread() {
 									: 'bg-white/20 backdrop-blur-md text-white'
 									}`}
 							>
-								{message.content}
+								{message.role === MessageRole.Assistant ? (
+									<div className="prose prose-invert prose-sm max-w-none">
+										<ReactMarkdown>
+											{preprocessText(message.content)}
+										</ReactMarkdown>
+									</div>
+								) : (
+									message.content
+								)}
 							</div>
 
 							{/* Add rating component only for assistant messages */}
 							{message.role === MessageRole.Assistant && (
 								<RatingComponent
 									conversationId={message.conversationId}
-									initialRating={message.rating || null}
+									initialRating={message.rating ?? null}
 									onRatingChange={handleRatingChange}
 								/>
 							)}
