@@ -9,7 +9,6 @@ import ReactMarkdown from 'react-markdown'; // Add this import
 
 // Enhanced preprocessing function with better regex and logging
 const preprocessText = (text: string): string => {
-	console.log("Original text:", text);
 
 	// More robust regex that handles periods within the text
 	const numberedListRegex = /(\d+\.\s+.+?)(?=\s+\d+\.\s+|\s*$)/gs;
@@ -21,10 +20,7 @@ const preprocessText = (text: string): string => {
 	// Process dash lists
 	processedText = processedText.replace(/(\-\s+[^\-\n]+)(?=\s+\-|\s*$)/g, '$1\n\n');
 
-	console.log("Processed text:", processedText);
-	console.log("Transformation summary:", text === processedText ?
-		"No changes made" :
-		"Text was reformatted for better markdown rendering");
+
 
 	return processedText;
 };
@@ -59,7 +55,6 @@ export function ChatThread() {
 	// TRPC mutation for sending messages to OpenAI
 	const sendMessage = api.aiConversations.chatWithAI.useMutation({
 		onSuccess: (response) => {
-			console.log("Received AI response:", response.response);
 			setCurrentConversationId(response.id.toString());
 			// Add the assistant's response to the messages
 			setMessages(prev => [...prev, {
@@ -68,12 +63,11 @@ export function ChatThread() {
 				role: MessageRole.Assistant,
 				content: response.response,
 				timestamp: new Date(),
-				rating: response.rating as Rating | null, // Include any existing rating
+				rating: 1 as Rating,
 			}]);
 			setIsLoading(false);
 		},
 		onError: (error) => {
-			// Handle error
 			setMessages(prev => [...prev, {
 				id: createMessageId(crypto.randomUUID()),
 				conversationId: createConversationId("1"),
@@ -86,15 +80,12 @@ export function ChatThread() {
 		}
 	});
 
-	// Scroll to bottom when messages change
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [messages]);
 
 	const handleSendMessage = () => {
 		if (!input.trim() || isLoading) return;
-
-		console.log("Sending message:", input);
 
 		// Add user message to the UI
 		const userMessage: ChatMessage = {

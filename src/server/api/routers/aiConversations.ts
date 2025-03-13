@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { type InferSelectModel } from "drizzle-orm";
 import OpenAI from "openai";
 import { env } from "~/env";
+import { type ChatCompletionMessageParam } from "openai/resources/chat";
 
 // Define the conversation type based on the schema
 export type AIConversation = InferSelectModel<typeof aiConversations>;
@@ -63,27 +64,26 @@ chatWithAI: publicProcedure
 
     try {
       // Prepare message history
-      const messages = [];
+      const messages: ChatCompletionMessageParam[] = [];
       
       // If conversationId exists, fetch previous messages in this conversation
-      if (input.conversationId) {
-        const previousMessages = await ctx.db
-          .select()
-          .from(aiConversations)
-          .where(eq(aiConversations.id, parseInt(input.conversationId)))
-          .orderBy(aiConversations.timestamp, 'asc');
-          
-        // Build message history for context
-        for (const msg of previousMessages) {
-          messages.push({ role: "user", content: msg.prompt });
-          messages.push({ role: "assistant", content: msg.response });
-        }
-      }
+// If conversationId exists, fetch previous messages in this conversation
+if (input.conversationId) {
+  const previousMessages = await ctx.db
+    .select()
+    .from(aiConversations)
+    .where(eq(aiConversations.id, parseInt(input.conversationId)))
+    .orderBy(aiConversations.timestamp);
+    
+  for (const msg of previousMessages) {
+    messages.push({ role: "user", content: msg.prompt });
+    messages.push({ role: "assistant", content: msg.response });
+  }
+}
       
       // Add the current prompt
       messages.push({ role: "user", content: input.prompt });
       
-      console.log("Sending request to OpenAI with messages:", messages);
       
       // Get response from OpenAI with full context
       const aiResponse = await openai.chat.completions.create({
@@ -93,13 +93,14 @@ chatWithAI: publicProcedure
 
       const responseText = aiResponse.choices[0]?.message?.content ?? "No response generated";
       
-      // Store the conversation in the database
+      // Store the conversation in the database with a default rating of 1
       const [result] = await ctx.db
         .insert(aiConversations)
         .values({
           userId: input.userId,
           prompt: input.prompt,
           response: responseText,
+          rating: 1, // Set default rating to 1
           metadata: input.metadata
         })
         .returning() as [AIConversation, ...AIConversation[]];
@@ -116,18 +117,21 @@ chatWithAI: publicProcedure
   }),
   
   // Update conversation rating
-  updateRating: publicProcedure
-    .input(z.object({
-      conversationId: z.number(),
-      rating: z.number().min(0).max(5)
-    }))
-    .mutation(async ({ ctx, input }): Promise<AIConversation> => {
-      const [result] = await ctx.db
-        .update(aiConversations)
-        .set({ rating: input.rating })
-        .where(eq(aiConversations.id, input.conversationId))
-        .returning() as [AIConversation, ...AIConversation[]];
-        
-      return result;
-    })
+updateRating: publicProcedure
+  .input(z.object({
+    conversationId: z.number(),
+    rating: z.number().min(0).max(5)
+  }))
+  .mutation(async ({ ctx, input }): Promise<AIConversation> => {
+    // Ensure rating is between 0-5
+    const validRating = Math.min(Math.max(Math.floor(input.rating), 0), 5);
+    
+    const [result] = await ctx.db
+      .update(aiConversations)
+      .set({ rating: validRating })
+      .where(eq(aiConversations.id, input.conversationId))
+      .returning() as [AIConversation, ...AIConversation[]];
+      
+    return result;
+  })
 });

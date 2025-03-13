@@ -14,12 +14,20 @@ export function RatingComponent({
 	initialRating,
 	onRatingChange
 }: RatingComponentProps) {
-	const [rating, setRating] = useState<Rating | null>(initialRating);
+	const [rating, setRating] = useState<Rating | null>(initialRating ?? 1 as Rating);
 
 	const handleRating = (newRating: number) => {
-		const typedRating = newRating as Rating;
-		setRating(typedRating);
-		onRatingChange(conversationId, newRating);
+		// Check if this is the same rating the user already selected
+		if (rating === newRating) {
+			// If clicking the same star again, clear the rating
+			setRating(null);
+			onRatingChange(conversationId, 0); // Or use null, depending on your backend
+		} else {
+			// Otherwise set the new rating
+			const typedRating = newRating as Rating;
+			setRating(typedRating);
+			onRatingChange(conversationId, newRating);
+		}
 	};
 
 	return (
