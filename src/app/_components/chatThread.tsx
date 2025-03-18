@@ -1,4 +1,4 @@
-// Update src/app/_components/ChatThread.tsx
+// src/app/_components/ChatThread.tsx
 'use client'
 import { useState, useRef, useEffect } from "react";
 import { api } from "~/trpc/react";
@@ -9,7 +9,6 @@ import ReactMarkdown from 'react-markdown'; // Add this import
 
 // Enhanced preprocessing function with better regex and logging
 const preprocessText = (text: string): string => {
-
 	// More robust regex that handles periods within the text
 	const numberedListRegex = /(\d+\.\s+.+?)(?=\s+\d+\.\s+|\s*$)/gs;
 	let processedText = text.replace(numberedListRegex, '$1\n\n');
@@ -20,8 +19,6 @@ const preprocessText = (text: string): string => {
 	// Process dash lists
 	processedText = processedText.replace(/(\-\s+[^\-\n]+)(?=\s+\-|\s*$)/g, '$1\n\n');
 
-
-
 	return processedText;
 };
 
@@ -30,7 +27,57 @@ export function ChatThread() {
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
-	const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(undefined);
+
+	// Get conversation ID from localStorage on component mount
+	const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(
+		typeof window !== 'undefined' ? localStorage.getItem('currentConversationId') || undefined : undefined
+	);
+
+	// Save conversation ID to localStorage whenever it changes
+	useEffect(() => {
+		if (currentConversationId) {
+			localStorage.setItem('currentConversationId', currentConversationId);
+		}
+	}, [currentConversationId]);
+
+	// Load conversation history when component mounts if there's a conversation ID
+	useEffect(() => {
+		if (currentConversationId) {
+			const loadHistory = async () => {
+				try {
+					const history = await api.aiConversations.getConversationHistory.query({
+						conversationId: currentConversationId
+					});
+
+					if (history && history.length > 0) {
+						const chatMessages = history.flatMap(msg => [
+							{
+								id: createMessageId(crypto.randomUUID()),
+								conversationId: createConversationId(msg.id.toString()),
+								role: MessageRole.User,
+								content: msg.prompt,
+								timestamp: new Date(msg.timestamp),
+							},
+							{
+								id: createMessageId(crypto.randomUUID()),
+								conversationId: createConversationId(msg.id.toString()),
+								role: MessageRole.Assistant,
+								content: msg.response,
+								timestamp: new Date(msg.timestamp),
+								rating: msg.rating as Rating | null,
+							}
+						]);
+
+						setMessages(chatMessages);
+					}
+				} catch (error) {
+					console.error("Failed to load conversation history:", error);
+				}
+			};
+
+			loadHistory();
+		}
+	}, []);
 
 	// Add the rating mutation
 	const updateRating = api.aiConversations.updateRating.useMutation({
@@ -55,7 +102,9 @@ export function ChatThread() {
 	// TRPC mutation for sending messages to OpenAI
 	const sendMessage = api.aiConversations.chatWithAI.useMutation({
 		onSuccess: (response) => {
+			// Save the conversation ID
 			setCurrentConversationId(response.id.toString());
+
 			// Add the assistant's response to the messages
 			setMessages(prev => [...prev, {
 				id: createMessageId(crypto.randomUUID()),
@@ -80,6 +129,7 @@ export function ChatThread() {
 		}
 	});
 
+	// Scroll to bottom when messages change
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [messages]);
@@ -90,7 +140,7 @@ export function ChatThread() {
 		// Add user message to the UI
 		const userMessage: ChatMessage = {
 			id: createMessageId(crypto.randomUUID()),
-			conversationId: createConversationId("1"), // Temporary ID until we get response
+			conversationId: createConversationId(currentConversationId || "1"), // Use current ID if available
 			role: MessageRole.User,
 			content: input,
 			timestamp: new Date(),
@@ -109,11 +159,26 @@ export function ChatThread() {
 		});
 	};
 
+	// Add function to start a new conversation
+	const handleNewConversation = () => {
+		localStorage.removeItem('currentConversationId');
+		setCurrentConversationId(undefined);
+		setMessages([]);
+	};
+
 	return (
 		<div className="flex flex-col h-[600px] w-full max-w-4xl rounded-xl bg-louGray2/90 backdrop-blur-md overflow-hidden">
 			{/* Chat header */}
-			<div className="bg-louPrimary p-4 border-b border-white/20">
+			<div className="bg-louPrimary p-4 border-b border-white/20 flex justify-between items-center">
 				<h2 className="text-xl font-bold">Ask Lou</h2>
+				{currentConversationId && (
+					<button
+						onClick={handleNewConversation}
+						className="bg-white/20 hover:bg-white/30 text-white text-sm rounded-md px-3 py-1"
+					>
+						New Conversation
+					</button>
+				)}
 			</div>
 
 			{/* Messages area */}

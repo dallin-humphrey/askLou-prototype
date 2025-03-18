@@ -7,6 +7,8 @@ import { type InferSelectModel } from "drizzle-orm";
 import OpenAI from "openai";
 import { env } from "~/env";
 import { type ChatCompletionMessageParam } from "openai/resources/chat";
+import { LOU_SYSTEM_PROMPT } from "~/lib/lou-prompt";
+
 
 // Define the conversation type based on the schema
 export type AIConversation = InferSelectModel<typeof aiConversations>;
@@ -64,10 +66,10 @@ chatWithAI: publicProcedure
 
     try {
       // Prepare message history
-      const messages: ChatCompletionMessageParam[] = [];
+      const messages: ChatCompletionMessageParam[] = [
+		{ role: "system", content: LOU_SYSTEM_PROMPT },
+	  ];
       
-      // If conversationId exists, fetch previous messages in this conversation
-// If conversationId exists, fetch previous messages in this conversation
 if (input.conversationId) {
   const previousMessages = await ctx.db
     .select()
