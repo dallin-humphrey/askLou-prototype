@@ -4,87 +4,104 @@ import { useState, useRef, useEffect } from "react";
 import { api } from "~/trpc/react";
 import { MessageRole, type ChatMessage, createMessageId } from "~/types/chat";
 import { createConversationId, type Rating } from "~/types/branded";
-import { RatingComponent } from "./RatingComponent"; // Import the new component
-import ReactMarkdown from 'react-markdown'; // Add this import
+import { RatingComponent } from "./RatingComponent";
+import ReactMarkdown from 'react-markdown';
+import { ConversationContext } from "~/lib/conversation-context";
+import { type AIConversation } from "~/server/api/routers/aiConversations";
 
-// Enhanced preprocessing function with better regex and logging
+// Enhanced preprocessing function
 const preprocessText = (text: string): string => {
-	// More robust regex that handles periods within the text
 	const numberedListRegex = /(\d+\.\s+.+?)(?=\s+\d+\.\s+|\s*$)/gs;
 	let processedText = text.replace(numberedListRegex, '$1\n\n');
-
-	// Process bullet points if needed
 	processedText = processedText.replace(/(\•\s+[^\•\n]+)(?=\s+\•|\s*$)/g, '$1\n\n');
-
-	// Process dash lists
 	processedText = processedText.replace(/(\-\s+[^\-\n]+)(?=\s+\-|\s*$)/g, '$1\n\n');
-
 	return processedText;
 };
 
 export function ChatThread() {
-	const [input, setInput] = useState("");
+	const [input, setInput] = useState<string>("");
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
-	const [isLoading, setIsLoading] = useState(false);
+	const [isLoading, setIsLoading] = useState<boolean>(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 
-	// Get conversation ID from localStorage on component mount
+	// Get conversation ID from localStorage
 	const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(
-		typeof window !== 'undefined' ? localStorage.getItem('currentConversationId') || undefined : undefined
+		ConversationContext.getCurrentConversationId() ?? undefined
 	);
 
 	// Save conversation ID to localStorage whenever it changes
 	useEffect(() => {
 		if (currentConversationId) {
-			localStorage.setItem('currentConversationId', currentConversationId);
+			ConversationContext.setConversationId(currentConversationId);
 		}
 	}, [currentConversationId]);
 
-	// Load conversation history when component mounts if there's a conversation ID
+	// Fetch conversation data when ID changes
 	useEffect(() => {
-		if (currentConversationId) {
-			const loadHistory = async () => {
-				try {
-					const history = await api.aiConversations.getConversationHistory.query({
-						conversationId: currentConversationId
-					});
+		if (!currentConversationId) return;
 
-					if (history && history.length > 0) {
-						const chatMessages = history.flatMap(msg => [
-							{
-								id: createMessageId(crypto.randomUUID()),
-								conversationId: createConversationId(msg.id.toString()),
-								role: MessageRole.User,
-								content: msg.prompt,
-								timestamp: new Date(msg.timestamp),
-							},
-							{
-								id: createMessageId(crypto.randomUUID()),
-								conversationId: createConversationId(msg.id.toString()),
-								role: MessageRole.Assistant,
-								content: msg.response,
-								timestamp: new Date(msg.timestamp),
-								rating: msg.rating as Rating | null,
-							}
-						]);
-
-						setMessages(chatMessages);
-					}
-				} catch (error) {
-					console.error("Failed to load conversation history:", error);
+		const fetchConversation = async (): Promise<void> => {
+			try {
+				// Safely parse the conversationId to number
+				const conversationIdNum = parseInt(currentConversationId, 10);
+				if (isNaN(conversationIdNum)) {
+					throw new Error("Invalid conversation ID");
 				}
-			};
 
-			loadHistory();
-		}
-	}, []);
+				// Use a manual fetch approach to avoid TRPC type issues
+				// This is a workaround for the tRPC call pattern mismatch
+				const response = await fetch(`/api/trpc/aiConversations.getById?batch=1&input={"0":{"id":${conversationIdNum}}}`);
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+				const data = await response.json();
+
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+				if (data.result?.data?.json) {
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+					const conversation = data.result.data.json as AIConversation;
+					if (!conversation) return;
+
+					// Create messages from the conversation data
+					const conversationId = createConversationId(String(conversation.id));
+
+					// User message
+					const userMessage: ChatMessage = {
+						id: createMessageId(crypto.randomUUID()),
+						conversationId,
+						role: MessageRole.User,
+						content: conversation.prompt ?? "",
+						timestamp: new Date(conversation.timestamp ?? Date.now())
+					};
+
+					// Assistant message
+					const assistantMessage: ChatMessage = {
+						id: createMessageId(crypto.randomUUID()),
+						conversationId,
+						role: MessageRole.Assistant,
+						content: conversation.response ?? "",
+						timestamp: new Date(conversation.timestamp ?? Date.now()),
+						rating: conversation.rating as Rating
+					};
+
+					setMessages([userMessage, assistantMessage]);
+				}
+			} catch (error) {
+				console.error("Failed to load conversation:", error);
+			}
+		};
+
+		// Using void operator to explicitly mark promise as handled
+		void fetchConversation();
+	}, [currentConversationId]);
 
 	// Add the rating mutation
 	const updateRating = api.aiConversations.updateRating.useMutation({
 		onSuccess: (response) => {
-			// Update the local messages state with the new rating
+			// Using the returned AIConversation to update our UI
+			const responseId = String(response.id);
+
 			setMessages(prev => prev.map(msg =>
-				msg.conversationId === createConversationId(response.id.toString())
+				msg.conversationId === createConversationId(responseId) &&
+					msg.role === MessageRole.Assistant
 					? { ...msg, rating: response.rating as Rating | null }
 					: msg
 			));
@@ -92,10 +109,19 @@ export function ChatThread() {
 	});
 
 	// Add rating handler function
-	const handleRatingChange = (conversationId: string, rating: number) => {
+	const handleRatingChange = (conversationId: string, rating: number): void => {
+		const parsedId = parseInt(conversationId, 10);
+		if (isNaN(parsedId)) {
+			console.error("Invalid conversation ID");
+			return;
+		}
+
+		// Ensure rating is within bounds
+		const boundedRating = Math.min(Math.max(rating, 0), 5) as Rating;
+
 		updateRating.mutate({
-			conversationId: parseInt(conversationId),
-			rating
+			conversationId: parsedId,
+			rating: boundedRating
 		});
 	};
 
@@ -103,17 +129,29 @@ export function ChatThread() {
 	const sendMessage = api.aiConversations.chatWithAI.useMutation({
 		onSuccess: (response) => {
 			// Save the conversation ID
-			setCurrentConversationId(response.id.toString());
+			const responseId = String(response.id);
+			setCurrentConversationId(responseId);
+
+			// Add the user message first
+			const userMessage: ChatMessage = {
+				id: createMessageId(crypto.randomUUID()),
+				conversationId: createConversationId(responseId),
+				role: MessageRole.User,
+				content: input,
+				timestamp: new Date(),
+			};
 
 			// Add the assistant's response to the messages
-			setMessages(prev => [...prev, {
+			const assistantMessage: ChatMessage = {
 				id: createMessageId(crypto.randomUUID()),
-				conversationId: createConversationId(response.id.toString()),
+				conversationId: createConversationId(responseId),
 				role: MessageRole.Assistant,
-				content: response.response,
+				content: response.response ?? "",
 				timestamp: new Date(),
-				rating: 1 as Rating,
-			}]);
+				rating: response.rating as Rating | null,
+			};
+
+			setMessages(prev => [...prev, userMessage, assistantMessage]);
 			setIsLoading(false);
 		},
 		onError: (error) => {
@@ -134,19 +172,11 @@ export function ChatThread() {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [messages]);
 
-	const handleSendMessage = () => {
+	const handleSendMessage = (): void => {
 		if (!input.trim() || isLoading) return;
 
-		// Add user message to the UI
-		const userMessage: ChatMessage = {
-			id: createMessageId(crypto.randomUUID()),
-			conversationId: createConversationId(currentConversationId || "1"), // Use current ID if available
-			role: MessageRole.User,
-			content: input,
-			timestamp: new Date(),
-		};
-
-		setMessages(prev => [...prev, userMessage]);
+		// Note: We don't need to add the user message here anymore
+		// as we'll add both messages when the API call succeeds
 		setIsLoading(true);
 		setInput("");
 
@@ -160,8 +190,8 @@ export function ChatThread() {
 	};
 
 	// Add function to start a new conversation
-	const handleNewConversation = () => {
-		localStorage.removeItem('currentConversationId');
+	const handleNewConversation = (): void => {
+		ConversationContext.clearConversationId();
 		setCurrentConversationId(undefined);
 		setMessages([]);
 	};
